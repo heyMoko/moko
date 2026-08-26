@@ -9,5 +9,15 @@ data class FilterDefinition(
             id = "original",
             displayName = "Original"
         )
+
+        val Flash = FilterDefinition(
+            id = "flash",
+            displayName = "Flash"
+        )
+
+        val EditorFilters = listOf(
+            Original,
+            Flash
+        )
     }
 }

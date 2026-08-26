@@ -3,6 +3,7 @@
 package com.mokostudio.moko.ui.editor
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mokostudio.moko.domain.model.FilterDefinition
 import com.mokostudio.moko.ui.theme.MokoTheme
 
 @Composable
@@ -55,6 +57,7 @@ fun EditorScreen(
     EditorScreenContent(
         uiState = uiState,
         onBackClick = onBackClick,
+        onFilterSelected = viewModel::selectFilter,
         modifier = modifier
     )
 }
@@ -63,6 +66,7 @@ fun EditorScreen(
 private fun EditorScreenContent(
     uiState: EditorUiState,
     onBackClick: () -> Unit,
+    onFilterSelected: (FilterDefinition) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -129,9 +133,15 @@ private fun EditorScreenContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    FilterPill("Original", selected = true, enabled = uiState.previewImage != null, modifier = Modifier.weight(1f))
-                    FilterPill("Flash", selected = false, enabled = false, modifier = Modifier.weight(1f))
-                    FilterPill("Film", selected = false, enabled = false, modifier = Modifier.weight(1f))
+                    FilterDefinition.EditorFilters.forEach { filter ->
+                        FilterPill(
+                            filter = filter,
+                            selected = uiState.selectedFilter == filter,
+                            enabled = uiState.previewImage != null && !uiState.isLoading,
+                            onClick = { onFilterSelected(filter) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
 
@@ -192,9 +202,10 @@ private fun BoxScope.PhotoPreview(uiState: EditorUiState) {
 
 @Composable
 private fun FilterPill(
-    name: String,
+    filter: FilterDefinition,
     selected: Boolean,
     enabled: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val background = if (selected) {
@@ -212,11 +223,12 @@ private fun FilterPill(
         modifier = modifier
             .height(44.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (enabled) background else MaterialTheme.colorScheme.surfaceVariant),
+            .background(if (enabled) background else MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = name,
+            text = filter.displayName,
             style = MaterialTheme.typography.labelLarge,
             color = if (enabled) foreground else MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -229,7 +241,8 @@ private fun EditorScreenPreview() {
     MokoTheme {
         EditorScreenContent(
             uiState = EditorUiState(),
-            onBackClick = {}
+            onBackClick = {},
+            onFilterSelected = {}
         )
     }
 }

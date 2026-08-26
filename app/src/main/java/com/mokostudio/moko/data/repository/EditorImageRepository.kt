@@ -1,5 +1,6 @@
 package com.mokostudio.moko.data.repository
 
+import android.graphics.Bitmap
 import android.net.Uri
 import com.mokostudio.moko.core.image.FilterEngine
 import com.mokostudio.moko.data.image.AndroidBitmapImageLoader
@@ -13,10 +14,24 @@ class EditorImageRepository @Inject constructor(
 ) {
     fun loadOriginalPreview(uri: Uri): ProcessedImage {
         val bitmap = imageLoader.loadSampledBitmap(uri)
+        return applyFilter(
+            uri = uri,
+            bitmap = bitmap,
+            filter = FilterDefinition.Original
+        )
+    }
+
+    fun applyFilter(
+        uri: Uri,
+        bitmap: Bitmap,
+        filter: FilterDefinition,
+        strength: Float = 1f
+    ): ProcessedImage {
         return filterEngine.applyFilter(
             sourceUri = uri,
             source = bitmap,
-            filter = FilterDefinition.Original
+            filter = filter,
+            strength = strength
         )
     }
 }
