@@ -1,5 +1,9 @@
 package com.mokostudio.moko.ui.home
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,9 +35,18 @@ import com.mokostudio.moko.ui.theme.MokoTheme
 
 @Composable
 fun HomeScreen(
-    onSelectPhotoClick: () -> Unit,
+    onPhotoSelected: (Uri) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            if (uri != null) {
+                onPhotoSelected(uri)
+            }
+        }
+    )
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -81,7 +94,11 @@ fun HomeScreen(
                 ExampleFilterStrip()
 
                 Button(
-                    onClick = onSelectPhotoClick,
+                    onClick = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
@@ -166,6 +183,6 @@ private fun ExampleFilterPreview(
 @Composable
 private fun HomeScreenPreview() {
     MokoTheme {
-        HomeScreen(onSelectPhotoClick = {})
+        HomeScreen(onPhotoSelected = {})
     }
 }
