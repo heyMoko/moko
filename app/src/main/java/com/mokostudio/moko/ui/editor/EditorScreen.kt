@@ -154,7 +154,19 @@ private fun EditorScreenContent(
 private fun BoxScope.PhotoPreview(uiState: EditorUiState) {
     when {
         uiState.isLoading -> {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                uiState.loadingMessage?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         uiState.error != null -> {

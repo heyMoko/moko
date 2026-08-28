@@ -9,5 +9,6 @@ data class EditorUiState(
     val previewImage: Bitmap? = null,
     val selectedFilter: FilterDefinition = FilterDefinition.Original,
     val isLoading: Boolean = false,
+    val loadingMessage: String? = null,
     val error: String? = null
 )
