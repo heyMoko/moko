@@ -19,7 +19,6 @@ import kotlin.coroutines.resumeWithException
 class MlKitPersonSegmenter @Inject constructor() : PersonSegmenter {
     private val options = SelfieSegmenterOptions.Builder()
         .setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
-        .enableRawSizeMask()
         .build()
 
     private val segmenter = Segmentation.getClient(options)
@@ -32,7 +31,9 @@ class MlKitPersonSegmenter @Inject constructor() : PersonSegmenter {
             source = rawPersonMask,
             targetWidth = bitmap.width,
             targetHeight = bitmap.height,
-            featherRadius = 2
+            // Flash uses the mask as a low-frequency illumination field. A broad pass
+            // removes segmentation blocks without spreading light into the background.
+            featherRadius = 14
         )
 
         Log.d(

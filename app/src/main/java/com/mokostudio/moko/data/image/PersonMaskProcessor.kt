@@ -2,9 +2,7 @@ package com.mokostudio.moko.data.image
 
 import com.mokostudio.moko.domain.model.PersonMask
 import kotlin.math.floor
-import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 object PersonMaskProcessor {
     fun scaleAndFeather(
@@ -42,14 +40,13 @@ object PersonMaskProcessor {
                     source.confidence[y1 * source.width + x1],
                     fx
                 )
-                scaled[y * targetWidth + x] = smoothMask(lerp(top, bottom, fy))
+                scaled[y * targetWidth + x] = lerp(top, bottom, fy).coerceIn(0f, 1f)
             }
         }
 
-        val feathered = if (featherRadius > 0) {
-            boxBlur(scaled, targetWidth, targetHeight, featherRadius)
-        } else {
-            scaled
+        var feathered = scaled
+        repeat(if (featherRadius > 0) 1 else 0) {
+            feathered = boxBlur(feathered, targetWidth, targetHeight, featherRadius)
         }
 
         return PersonMask(
@@ -65,31 +62,38 @@ object PersonMaskProcessor {
         height: Int,
         radius: Int
     ): FloatArray {
-        val clampedRadius = radius.coerceIn(1, 8)
+        val clampedRadius = radius.coerceIn(1, 32)
+        val horizontal = FloatArray(source.size)
         val output = FloatArray(source.size)
+        val windowSize = clampedRadius * 2 + 1
 
         for (y in 0 until height) {
+            var sum = 0f
+            for (offset in -clampedRadius..clampedRadius) {
+                sum += source[y * width + offset.coerceIn(0, width - 1)]
+            }
             for (x in 0 until width) {
-                var sum = 0f
-                var count = 0
-                for (offsetY in -clampedRadius..clampedRadius) {
-                    val sampleY = (y + offsetY).coerceIn(0, height - 1)
-                    for (offsetX in -clampedRadius..clampedRadius) {
-                        val sampleX = (x + offsetX).coerceIn(0, width - 1)
-                        sum += source[sampleY * width + sampleX]
-                        count++
-                    }
-                }
-                output[y * width + x] = (sum / max(1, count)).coerceIn(0f, 1f)
+                horizontal[y * width + x] = sum / windowSize
+                val removeX = (x - clampedRadius).coerceIn(0, width - 1)
+                val addX = (x + clampedRadius + 1).coerceIn(0, width - 1)
+                sum += source[y * width + addX] - source[y * width + removeX]
+            }
+        }
+
+        for (x in 0 until width) {
+            var sum = 0f
+            for (offset in -clampedRadius..clampedRadius) {
+                sum += horizontal[offset.coerceIn(0, height - 1) * width + x]
+            }
+            for (y in 0 until height) {
+                output[y * width + x] = (sum / windowSize).coerceIn(0f, 1f)
+                val removeY = (y - clampedRadius).coerceIn(0, height - 1)
+                val addY = (y + clampedRadius + 1).coerceIn(0, height - 1)
+                sum += horizontal[addY * width + x] - horizontal[removeY * width + x]
             }
         }
 
         return output
-    }
-
-    private fun smoothMask(value: Float): Float {
-        val clamped = value.coerceIn(0f, 1f)
-        return (clamped * clamped * (3f - 2f * clamped) * 1_000f).roundToInt() / 1_000f
     }
 
     private fun lerp(start: Float, end: Float, amount: Float): Float {
