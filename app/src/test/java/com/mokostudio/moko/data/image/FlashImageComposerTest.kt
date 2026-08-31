@@ -39,6 +39,39 @@ class FlashImageComposerTest {
     }
 
     @Test
+    fun compose_doesNotApplyPersonLiftToLowConfidenceOuterMask() {
+        val original = IntArray(3) { argb(255, 94, 67, 57) }
+        val mask = PersonMask(3, 1, floatArrayOf(0f, 0.20f, 1f))
+
+        val result = FlashImageComposer.compose(original, 3, 1, 1f, mask)
+
+        assertEquals(result[0], result[1])
+        assertTrue(luma(result[2]) > luma(result[1]) + 0.06f)
+    }
+
+    @Test
+    fun compose_deepensBackgroundMoreThanTheSharedSceneGrade() {
+        val original = IntArray(2) { argb(255, 94, 67, 57) }
+        val mask = PersonMask(2, 1, floatArrayOf(0f, 1f))
+
+        val result = FlashImageComposer.compose(original, 2, 1, 1f, mask)
+
+        assertTrue(luma(original[0]) - luma(result[0]) > 0.09f)
+        assertTrue(luma(result[1]) > luma(result[0]) + 0.10f)
+    }
+
+    @Test
+    fun compose_preservesVeryDarkBackgroundDetail() {
+        val original = intArrayOf(argb(255, 20, 19, 18), argb(255, 94, 67, 57))
+        val mask = PersonMask(2, 1, floatArrayOf(0f, 1f))
+
+        val result = FlashImageComposer.compose(original, 2, 1, 1f, mask)
+
+        assertTrue(luma(result[0]) > 0.02f)
+        assertTrue(luma(result[0]) < luma(original[0]))
+    }
+
+    @Test
     fun compose_liftsSkinMoreThanBlackClothingInsidePersonMask() {
         val original = intArrayOf(argb(255, 16, 16, 16), argb(255, 94, 67, 57))
         val mask = PersonMask(2, 1, floatArrayOf(1f, 1f))

@@ -35,14 +35,21 @@ object FlashImageComposer {
             // Keep the flash transition inside the detected person. The S-curve begins
             // above zero, which removes the blurred mask's outer background spill without
             // introducing a cutout edge.
-            val subject = smoothStep(0.18f, 0.98f, rawSubject)
+            val subject = smoothStep(0.28f, 0.98f, rawSubject)
+            val background = if (mask != null) 1f - subject else 0f
 
-            // The scene grade is intentionally subtle and applies everywhere. It keeps the
-            // background from becoming brighter than a direct-flash subject.
-            val sceneDarken = 0.050f + highlight * 0.135f
-            var r = applyContrast(sourceR, 1.10f, 0.47f) - sceneDarken
-            var g = applyContrast(sourceG, 1.10f, 0.47f) - sceneDarken
-            var b = applyContrast(sourceB, 1.10f, 0.47f) - sceneDarken * 0.93f
+            // Direct-flash compact cameras leave the scene behind the person noticeably
+            // darker and punchier. Keep that extra grade outside the detected body, so the
+            // current subject brightness and the corrected body edge stay intact.
+            val shadowProtection = 1f - smoothStep(0.05f, 0.24f, sourceLuma)
+            val requestedContrast = 1.10f + background * 0.035f
+            val sceneContrast = lerp(1f, requestedContrast, 1f - shadowProtection * 0.65f)
+            val requestedDarken = 0.050f + highlight * 0.135f +
+                background * (0.035f + highlight * 0.025f)
+            val sceneDarken = requestedDarken * (1f - shadowProtection * 0.75f)
+            var r = applyContrast(sourceR, sceneContrast, 0.47f) - sceneDarken
+            var g = applyContrast(sourceG, sceneContrast, 0.47f) - sceneDarken
+            var b = applyContrast(sourceB, sceneContrast, 0.47f) - sceneDarken * 0.93f
 
             // The mask is a continuous exposure weight, never a binary person/background cut.
             val skin = skinScore(sourceR, sourceG, sourceB)

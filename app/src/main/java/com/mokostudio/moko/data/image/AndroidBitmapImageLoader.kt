@@ -81,6 +81,8 @@ class AndroidBitmapImageLoader @Inject constructor(
     }
 
     private companion object {
-        const val DEFAULT_MAX_DIMENSION = 2_048
+        // Keep more real image detail in the editor preview while still sampling large
+        // gallery originals before CPU Bitmap processing.
+        const val DEFAULT_MAX_DIMENSION = 3_072
     }
 }

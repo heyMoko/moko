@@ -44,9 +44,15 @@ object PersonMaskProcessor {
             }
         }
 
-        var feathered = scaled
-        repeat(if (featherRadius > 0) 1 else 0) {
-            feathered = boxBlur(feathered, targetWidth, targetHeight, featherRadius)
+        val feathered = if (featherRadius > 0) {
+            val blurred = boxBlur(scaled, targetWidth, targetHeight, featherRadius)
+            // Blur is useful for smoothing ML Kit's low-resolution mask, but a normal blur
+            // also raises confidence on the background side of a body edge. Cap it by the
+            // original confidence so Flash can soften *inside* the person without spilling
+            // its extra exposure onto the surrounding background.
+            FloatArray(scaled.size) { index -> min(scaled[index], blurred[index]) }
+        } else {
+            scaled
         }
 
         return PersonMask(

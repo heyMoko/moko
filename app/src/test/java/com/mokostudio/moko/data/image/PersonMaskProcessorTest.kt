@@ -51,4 +51,24 @@ class PersonMaskProcessorTest {
         assertTrue(center > 0f)
         assertTrue(center < 1f)
     }
+
+    @Test
+    fun scaleAndFeather_doesNotSpreadConfidenceOutsideOriginalPersonArea() {
+        val mask = PersonMask(
+            width = 6,
+            height = 1,
+            confidence = floatArrayOf(0f, 0f, 1f, 1f, 0f, 0f)
+        )
+
+        val feathered = PersonMaskProcessor.scaleAndFeather(
+            source = mask,
+            targetWidth = 6,
+            targetHeight = 1,
+            featherRadius = 1
+        )
+
+        assertEquals(0f, feathered.confidence[1], 0f)
+        assertEquals(0f, feathered.confidence[4], 0f)
+        assertTrue(feathered.confidence[2] > 0f)
+    }
 }
