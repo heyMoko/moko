@@ -35,7 +35,18 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -183,14 +194,19 @@ private fun BoxScope.PhotoPreview(uiState: EditorUiState) {
             )
         }
 
-        uiState.previewImage != null -> {
-            Image(
-                bitmap = uiState.previewImage.asImageBitmap(),
-                contentDescription = null,
-                modifier = Modifier.matchParentSize(),
-                contentScale = ContentScale.Fit
+        uiState.previewImage != null && uiState.originalPreviewImage != null &&
+            uiState.selectedFilter != FilterDefinition.Original ->
+            BeforeAfterPreview(
+                original = uiState.originalPreviewImage,
+                processed = uiState.previewImage
             )
-        }
+
+        uiState.previewImage != null -> Image(
+            bitmap = uiState.previewImage.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier.matchParentSize(),
+            contentScale = ContentScale.Fit
+        )
 
         else -> {
             Box(
@@ -214,6 +230,98 @@ private fun BoxScope.PhotoPreview(uiState: EditorUiState) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun BoxScope.BeforeAfterPreview(
+    original: android.graphics.Bitmap,
+    processed: android.graphics.Bitmap
+) {
+    var position by remember(original) { mutableFloatStateOf(DEFAULT_COMPARISON_POSITION) }
+    val dividerStroke = with(LocalDensity.current) { 2.dp.toPx() }
+    val handleRadius = with(LocalDensity.current) { 18.dp.toPx() }
+
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        position = (offset.x / size.width).coerceIn(0f, 1f)
+                    },
+                    onHorizontalDrag = { change, _ ->
+                        change.consume()
+                        position = (change.position.x / size.width).coerceIn(0f, 1f)
+                    }
+                )
+            }
+    ) {
+        Image(
+            bitmap = processed.asImageBitmap(),
+            contentDescription = "After applying filter",
+            modifier = Modifier.matchParentSize(),
+            contentScale = ContentScale.Fit
+        )
+
+        Image(
+            bitmap = original.asImageBitmap(),
+            contentDescription = "Before applying filter",
+            modifier = Modifier
+                .matchParentSize()
+                .drawWithContent {
+                    clipRect(right = size.width * position) {
+                        this@drawWithContent.drawContent()
+                    }
+                },
+            contentScale = ContentScale.Fit
+        )
+
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val dividerX = size.width * position
+            drawLine(
+                color = Color.White,
+                start = Offset(dividerX, 0f),
+                end = Offset(dividerX, size.height),
+                strokeWidth = dividerStroke
+            )
+            drawCircle(
+                color = Color.White,
+                radius = handleRadius,
+                center = Offset(dividerX, size.height / 2f)
+            )
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.72f),
+                radius = handleRadius,
+                center = Offset(dividerX, size.height / 2f),
+                style = Stroke(width = dividerStroke)
+            )
+        }
+
+        Text(
+            text = "Before",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(12.dp)
+        )
+        Text(
+            text = "After",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp)
+        )
+        Text(
+            text = "Drag to compare",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(12.dp)
+        )
     }
 }
 
@@ -291,3 +399,5 @@ private fun EditorScreenPreview() {
         )
     }
 }
+
+private const val DEFAULT_COMPARISON_POSITION = 0.5f

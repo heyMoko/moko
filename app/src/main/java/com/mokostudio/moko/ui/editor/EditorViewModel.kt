@@ -53,6 +53,7 @@ class EditorViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 originalImageUri = uri,
+                originalPreviewImage = null,
                 previewImage = null,
                 filterThumbnails = emptyMap(),
                 isLoading = true,
@@ -76,6 +77,7 @@ class EditorViewModel @Inject constructor(
                     sourceBitmap = processedImage.bitmap
                     _uiState.update { state ->
                         state.copy(
+                            originalPreviewImage = processedImage.bitmap,
                             previewImage = processedImage.bitmap,
                             selectedFilter = processedImage.filter,
                             isLoading = false,
@@ -89,6 +91,7 @@ class EditorViewModel @Inject constructor(
                     Log.e(TAG, "Could not load photo: $uri", it)
                     _uiState.update { state ->
                         state.copy(
+                            originalPreviewImage = null,
                             previewImage = null,
                             isLoading = false,
                             loadingMessage = null,

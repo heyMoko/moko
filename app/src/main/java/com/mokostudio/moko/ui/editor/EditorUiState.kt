@@ -6,6 +6,7 @@ import com.mokostudio.moko.domain.model.FilterDefinition
 
 data class EditorUiState(
     val originalImageUri: Uri? = null,
+    val originalPreviewImage: Bitmap? = null,
     val previewImage: Bitmap? = null,
     val filterThumbnails: Map<FilterDefinition, Bitmap> = emptyMap(),
     val selectedFilter: FilterDefinition = FilterDefinition.Original,
