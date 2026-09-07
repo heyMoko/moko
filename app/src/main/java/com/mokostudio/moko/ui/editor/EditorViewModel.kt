@@ -31,7 +31,9 @@ class EditorViewModel @Inject constructor(
     private var cachedPersonMask: PersonMask? = null
     private var loadJob: Job? = null
     private var filterJob: Job? = null
-    private var requestToken = 0
+    private var thumbnailJob: Job? = null
+    private var imageRequestToken = 0
+    private var filterRequestToken = 0
 
     fun loadImage(uriString: String?) {
         val uri = uriString?.let(Uri::parse)
@@ -39,10 +41,11 @@ class EditorViewModel @Inject constructor(
             return
         }
 
-        requestToken++
-        val token = requestToken
+        imageRequestToken++
+        val token = imageRequestToken
         loadJob?.cancel()
         filterJob?.cancel()
+        thumbnailJob?.cancel()
         cachedMaskUri = null
         cachedPersonMask = null
         sourceBitmap = null
@@ -51,7 +54,9 @@ class EditorViewModel @Inject constructor(
             it.copy(
                 originalImageUri = uri,
                 previewImage = null,
+                filterThumbnails = emptyMap(),
                 isLoading = true,
+                isThumbnailLoading = false,
                 loadingMessage = "Loading",
                 error = null
             )
@@ -64,12 +69,12 @@ class EditorViewModel @Inject constructor(
                 }
             }
 
-            if (token != requestToken) return@launch
+            if (token != imageRequestToken) return@launch
 
-            _uiState.update { state ->
-                result.fold(
-                    onSuccess = { processedImage ->
-                        sourceBitmap = processedImage.bitmap
+            result.fold(
+                onSuccess = { processedImage ->
+                    sourceBitmap = processedImage.bitmap
+                    _uiState.update { state ->
                         state.copy(
                             previewImage = processedImage.bitmap,
                             selectedFilter = processedImage.filter,
@@ -77,9 +82,12 @@ class EditorViewModel @Inject constructor(
                             loadingMessage = null,
                             error = null
                         )
-                    },
-                    onFailure = {
-                        Log.e(TAG, "Could not load photo: $uri", it)
+                    }
+                    createFilterThumbnails(uri, processedImage.bitmap, token)
+                },
+                onFailure = {
+                    Log.e(TAG, "Could not load photo: $uri", it)
+                    _uiState.update { state ->
                         state.copy(
                             previewImage = null,
                             isLoading = false,
@@ -87,9 +95,74 @@ class EditorViewModel @Inject constructor(
                             error = "Could not load this photo."
                         )
                     }
+                }
+            )
+        }
+    }
+
+    private fun createFilterThumbnails(uri: Uri, bitmap: Bitmap, token: Int) {
+        thumbnailJob?.cancel()
+        _uiState.update { it.copy(isThumbnailLoading = true) }
+
+        thumbnailJob = viewModelScope.launch {
+            val thumbnails = runCatching {
+                withContext(Dispatchers.Default) {
+                    val sourceThumbnail = bitmap.createThumbnail()
+                    buildMap {
+                        put(FilterDefinition.Original, sourceThumbnail)
+                        FilterDefinition.EditorFilters
+                            .filterNot { it == FilterDefinition.Original }
+                            .forEach { filter ->
+                                val personMask = if (filter == FilterDefinition.Flash) {
+                                    imageRepository.createPersonMask(sourceThumbnail)
+                                        .takeIf(PersonMask::hasPerson)
+                                } else {
+                                    null
+                                }
+                                put(
+                                    filter,
+                                    imageRepository.applyFilter(
+                                        uri = uri,
+                                        bitmap = sourceThumbnail,
+                                        filter = filter,
+                                        personMask = personMask
+                                    ).bitmap
+                                )
+                            }
+                    }
+                }
+            }
+
+            if (token != imageRequestToken) return@launch
+
+            _uiState.update { state ->
+                thumbnails.fold(
+                    onSuccess = { generated ->
+                        state.copy(
+                            filterThumbnails = generated,
+                            isThumbnailLoading = false
+                        )
+                    },
+                    onFailure = {
+                        Log.w(TAG, "Could not generate filter thumbnails", it)
+                        state.copy(isThumbnailLoading = false)
+                    }
                 )
             }
         }
+    }
+
+    private fun Bitmap.createThumbnail(): Bitmap {
+        val longestEdge = maxOf(width, height)
+        if (longestEdge <= THUMBNAIL_MAX_DIMENSION) return this
+
+        val scale = THUMBNAIL_MAX_DIMENSION.toFloat() / longestEdge
+        return Bitmap.createScaledBitmap(
+            this,
+            (width * scale).toInt().coerceAtLeast(1),
+            (height * scale).toInt().coerceAtLeast(1),
+            true
+        )
     }
 
     fun selectFilter(filter: FilterDefinition) {
@@ -99,8 +172,8 @@ class EditorViewModel @Inject constructor(
             return
         }
 
-        requestToken++
-        val token = requestToken
+        filterRequestToken++
+        val token = filterRequestToken
         filterJob?.cancel()
 
         _uiState.update {
@@ -128,7 +201,7 @@ class EditorViewModel @Inject constructor(
                 }
             }
 
-            if (token != requestToken) return@launch
+            if (token != filterRequestToken) return@launch
 
             _uiState.update { state ->
                 result.fold(
@@ -187,6 +260,7 @@ class EditorViewModel @Inject constructor(
     override fun onCleared() {
         loadJob?.cancel()
         filterJob?.cancel()
+        thumbnailJob?.cancel()
         cachedPersonMask = null
         sourceBitmap = null
         super.onCleared()
@@ -194,5 +268,6 @@ class EditorViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "EditorViewModel"
+        const val THUMBNAIL_MAX_DIMENSION = 240
     }
 }

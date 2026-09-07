@@ -33,10 +33,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mokostudio.moko.domain.model.FilterDefinition
 import com.mokostudio.moko.ui.theme.MokoTheme
@@ -130,16 +133,18 @@ private fun EditorScreenContent(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     FilterDefinition.EditorFilters.forEach { filter ->
-                        FilterPill(
+                        FilterThumbnail(
                             filter = filter,
+                            thumbnail = uiState.filterThumbnails[filter],
                             selected = uiState.selectedFilter == filter,
                             enabled = uiState.previewImage != null && !uiState.isLoading,
+                            isLoading = uiState.isThumbnailLoading &&
+                                uiState.filterThumbnails[filter] == null,
                             onClick = { onFilterSelected(filter) },
-                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -213,36 +218,64 @@ private fun BoxScope.PhotoPreview(uiState: EditorUiState) {
 }
 
 @Composable
-private fun FilterPill(
+private fun FilterThumbnail(
     filter: FilterDefinition,
+    thumbnail: android.graphics.Bitmap?,
     selected: Boolean,
     enabled: Boolean,
+    isLoading: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
-    val background = if (selected) {
-        MaterialTheme.colorScheme.onBackground
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val foreground = if (selected) {
-        MaterialTheme.colorScheme.background
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Box(
-        modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (enabled) background else MaterialTheme.colorScheme.surfaceVariant)
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
             .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        Box(
+            modifier = Modifier
+                .height(96.dp)
+                .aspectRatio(0.82f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .then(
+                    if (selected) {
+                        Modifier.border(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    } else {
+                        Modifier
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                thumbnail != null -> Image(
+                    bitmap = thumbnail.asImageBitmap(),
+                    contentDescription = "${filter.displayName} filter preview",
+                    modifier = Modifier.matchParentSize(),
+                    contentScale = ContentScale.Crop
+                )
+
+                isLoading -> CircularProgressIndicator(
+                    modifier = Modifier.height(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         Text(
             text = filter.displayName,
             style = MaterialTheme.typography.labelLarge,
-            color = if (enabled) foreground else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (selected) {
+                MaterialTheme.colorScheme.onBackground
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
         )
     }
 }
