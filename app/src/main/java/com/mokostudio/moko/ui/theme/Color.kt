@@ -2,8 +2,13 @@ package com.mokostudio.moko.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val MokoBlack = Color(0xFF101010)
-val MokoWhite = Color(0xFFFAFAFA)
-val MokoGray = Color(0xFF8E8E8E)
-val MokoLightGray = Color(0xFFE8E8E8)
-val MokoDarkSurface = Color(0xFF242424)
+val MokoInk = Color(0xFF2A1714)
+val MokoCream = Color(0xFFFFF8F4)
+val MokoBerry = Color(0xFFE9433B)
+val MokoCoral = Color(0xFFFF6549)
+val MokoTangerine = Color(0xFFFF9A4D)
+val MokoPeach = Color(0xFFFFDED0)
+val MokoBlush = Color(0xFFFFEEE8)
+val MokoMutedBrown = Color(0xFF8D665E)
+val MokoDeepBerry = Color(0xFF5B1B1A)
+val MokoDarkSurface = Color(0xFF351C1A)
