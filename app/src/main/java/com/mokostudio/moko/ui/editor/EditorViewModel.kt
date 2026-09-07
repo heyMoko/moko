@@ -116,7 +116,7 @@ class EditorViewModel @Inject constructor(
                         FilterDefinition.EditorFilters
                             .filterNot { it == FilterDefinition.Original }
                             .forEach { filter ->
-                                val personMask = if (filter == FilterDefinition.Flash) {
+                                val personMask = if (filter.requiresPersonMask) {
                                     imageRepository.createPersonMask(sourceThumbnail)
                                         .takeIf(PersonMask::hasPerson)
                                 } else {
@@ -182,7 +182,7 @@ class EditorViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isLoading = true,
-                loadingMessage = if (filter == FilterDefinition.Flash) "Finding person" else "Processing",
+                loadingMessage = if (filter.requiresPersonMask) "Finding person" else "Processing",
                 error = null
             )
         }
@@ -190,7 +190,7 @@ class EditorViewModel @Inject constructor(
         filterJob = viewModelScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    val personMask = if (filter == FilterDefinition.Flash) {
+                    val personMask = if (filter.requiresPersonMask) {
                         getOrCreatePersonMask(uri, bitmap)
                     } else {
                         null

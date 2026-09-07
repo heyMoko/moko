@@ -18,7 +18,10 @@ class MokoImageProcessor @Inject constructor() : ImageProcessor {
     ): ProcessedImage {
         val bitmap = when (filter.id) {
             FilterDefinition.Flash.id -> applyFlashLook(source, strength, personMask)
-            else -> source
+            FilterDefinition.NightFlash.id -> applyNightFlashLook(source, strength, personMask)
+            else -> filter.parameters?.let { parameters ->
+                applyCameraLook(source, parameters, strength)
+            } ?: source
         }
 
         return ProcessedImage(
@@ -50,6 +53,43 @@ class MokoImageProcessor @Inject constructor() : ImageProcessor {
 
         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
             setPixels(flashed, 0, width, 0, 0, width, height)
+        }
+    }
+
+    private fun applyNightFlashLook(
+        source: Bitmap,
+        strength: Float,
+        personMask: PersonMask?
+    ): Bitmap {
+        val flashBase = applyFlashLook(source, strength, personMask)
+        return applyCameraLook(
+            source = flashBase,
+            parameters = requireNotNull(FilterDefinition.NightFlash.parameters),
+            strength = strength
+        )
+    }
+
+    private fun applyCameraLook(
+        source: Bitmap,
+        parameters: com.mokostudio.moko.domain.model.FilterParameters,
+        strength: Float
+    ): Bitmap {
+        if (strength <= 0f) return source
+
+        val width = source.width
+        val height = source.height
+        val original = IntArray(width * height)
+        source.getPixels(original, 0, width, 0, 0, width, height)
+        val processed = CameraLookComposer.compose(
+            original = original,
+            width = width,
+            height = height,
+            parameters = parameters,
+            strength = strength
+        )
+
+        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+            setPixels(processed, 0, width, 0, 0, width, height)
         }
     }
 }
