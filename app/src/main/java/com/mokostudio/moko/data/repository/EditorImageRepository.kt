@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import com.mokostudio.moko.core.image.FilterEngine
 import com.mokostudio.moko.data.image.AndroidBitmapImageLoader
+import com.mokostudio.moko.data.image.MediaStoreImageSaver
 import com.mokostudio.moko.data.image.PersonSegmenter
 import com.mokostudio.moko.domain.model.FilterDefinition
 import com.mokostudio.moko.domain.model.PersonMask
@@ -13,7 +14,8 @@ import javax.inject.Inject
 class EditorImageRepository @Inject constructor(
     private val imageLoader: AndroidBitmapImageLoader,
     private val filterEngine: FilterEngine,
-    private val personSegmenter: PersonSegmenter
+    private val personSegmenter: PersonSegmenter,
+    private val imageSaver: MediaStoreImageSaver
 ) {
     fun loadOriginalPreview(uri: Uri): ProcessedImage {
         val bitmap = imageLoader.loadSampledBitmap(uri)
@@ -39,6 +41,10 @@ class EditorImageRepository @Inject constructor(
             personMask = personMask
         )
     }
+
+    fun loadOriginalForSave(uri: Uri): Bitmap = imageLoader.loadFullResolutionBitmap(uri)
+
+    fun saveEditedImage(bitmap: Bitmap): Uri = imageSaver.save(bitmap)
 
     suspend fun createPersonMask(bitmap: Bitmap): PersonMask {
         return personSegmenter.createMask(bitmap)

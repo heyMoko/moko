@@ -16,6 +16,13 @@ class AndroidBitmapImageLoader @Inject constructor(
     fun loadSampledBitmap(
         uri: Uri,
         maxDimension: Int = DEFAULT_MAX_DIMENSION
+    ): Bitmap = loadBitmap(uri, maxDimension)
+
+    fun loadFullResolutionBitmap(uri: Uri): Bitmap = loadBitmap(uri, null)
+
+    private fun loadBitmap(
+        uri: Uri,
+        maxDimension: Int?
     ): Bitmap {
         val boundsOptions = BitmapFactory.Options().apply {
             inJustDecodeBounds = true
@@ -33,11 +40,13 @@ class AndroidBitmapImageLoader @Inject constructor(
 
         val decodeOptions = BitmapFactory.Options().apply {
             inPreferredConfig = Bitmap.Config.ARGB_8888
-            inSampleSize = BitmapSampleSizeCalculator.calculate(
-                width = width,
-                height = height,
-                maxDimension = maxDimension
-            )
+            inSampleSize = maxDimension?.let {
+                BitmapSampleSizeCalculator.calculate(
+                    width = width,
+                    height = height,
+                    maxDimension = it
+                )
+            } ?: 1
         }
 
         val decoded = context.contentResolver.openInputStream(uri)?.use { input ->

@@ -32,6 +32,7 @@ class EditorViewModel @Inject constructor(
     private var loadJob: Job? = null
     private var filterJob: Job? = null
     private var thumbnailJob: Job? = null
+    private var saveJob: Job? = null
     private var imageRequestToken = 0
     private var filterRequestToken = 0
 
@@ -46,6 +47,7 @@ class EditorViewModel @Inject constructor(
         loadJob?.cancel()
         filterJob?.cancel()
         thumbnailJob?.cancel()
+        saveJob?.cancel()
         cachedMaskUri = null
         cachedPersonMask = null
         sourceBitmap = null
@@ -59,7 +61,10 @@ class EditorViewModel @Inject constructor(
                 isLoading = true,
                 isThumbnailLoading = false,
                 loadingMessage = "Loading",
-                error = null
+                error = null,
+                isSaving = false,
+                saveMessage = null,
+                saveError = null
             )
         }
 
@@ -171,7 +176,9 @@ class EditorViewModel @Inject constructor(
     fun selectFilter(filter: FilterDefinition) {
         val uri = _uiState.value.originalImageUri ?: return
         val bitmap = sourceBitmap ?: return
-        if (filter == _uiState.value.selectedFilter && !_uiState.value.isLoading) {
+        if (_uiState.value.isSaving ||
+            (filter == _uiState.value.selectedFilter && !_uiState.value.isLoading)
+        ) {
             return
         }
 
@@ -183,7 +190,9 @@ class EditorViewModel @Inject constructor(
             it.copy(
                 isLoading = true,
                 loadingMessage = if (filter.requiresPersonMask) "Finding person" else "Processing",
-                error = null
+                error = null,
+                saveMessage = null,
+                saveError = null
             )
         }
 
@@ -233,6 +242,85 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun saveImage() {
+        val state = _uiState.value
+        val uri = state.originalImageUri ?: return
+        val filter = state.selectedFilter
+        if (state.previewImage == null || state.isLoading || state.isSaving) return
+
+        saveJob?.cancel()
+        _uiState.update {
+            it.copy(
+                isSaving = true,
+                saveMessage = null,
+                saveError = null
+            )
+        }
+
+        saveJob = viewModelScope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val original = imageRepository.loadOriginalForSave(uri)
+                    var edited: Bitmap? = null
+                    try {
+                        val personMask = if (filter.requiresPersonMask) {
+                            createPersonMaskForSave(uri, original)
+                        } else {
+                            null
+                        }
+                        edited = imageRepository.applyFilter(
+                            uri = uri,
+                            bitmap = original,
+                            filter = filter,
+                            personMask = personMask
+                        ).bitmap
+                        imageRepository.saveEditedImage(edited)
+                    } finally {
+                        if (edited != null && edited !== original && !edited.isRecycled) {
+                            edited.recycle()
+                        }
+                        if (!original.isRecycled) {
+                            original.recycle()
+                        }
+                    }
+                }
+            }
+
+            _uiState.update { current ->
+                result.fold(
+                    onSuccess = {
+                        current.copy(
+                            isSaving = false,
+                            saveMessage = "Saved to gallery",
+                            saveError = null
+                        )
+                    },
+                    onFailure = { error ->
+                        if (error is CancellationException) {
+                            current
+                        } else {
+                            Log.e(TAG, "Could not save photo", error)
+                            current.copy(
+                                isSaving = false,
+                                saveMessage = null,
+                                saveError = "Could not save this photo. Try again."
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    fun onSavePermissionDenied() {
+        _uiState.update {
+            it.copy(
+                saveMessage = null,
+                saveError = "Gallery permission is needed to save on this Android version."
+            )
+        }
+    }
+
     private suspend fun getOrCreatePersonMask(uri: Uri, bitmap: Bitmap): PersonMask? {
         val cached = cachedPersonMask
         if (cachedMaskUri == uri && cached != null) {
@@ -260,10 +348,24 @@ class EditorViewModel @Inject constructor(
         )
     }
 
+    private suspend fun createPersonMaskForSave(uri: Uri, bitmap: Bitmap): PersonMask? {
+        return runCatching {
+            imageRepository.createPersonMask(bitmap)
+        }.fold(
+            onSuccess = { mask -> mask.takeIf(PersonMask::hasPerson) },
+            onFailure = {
+                if (it is CancellationException) throw it
+                Log.w(TAG, "ML Kit segmentation failed while saving $uri. Using flash fallback.", it)
+                null
+            }
+        )
+    }
+
     override fun onCleared() {
         loadJob?.cancel()
         filterJob?.cancel()
         thumbnailJob?.cancel()
+        saveJob?.cancel()
         cachedPersonMask = null
         sourceBitmap = null
         super.onCleared()

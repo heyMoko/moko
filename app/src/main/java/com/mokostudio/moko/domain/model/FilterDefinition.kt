@@ -102,11 +102,11 @@ data class FilterDefinition(
         val EditorFilters = listOf(
             Original,
             Flash,
+            NightFlash,
             IPhone6,
             Film,
             Disposable,
-            Digital,
-            NightFlash
+            Digital
         )
     }
 }

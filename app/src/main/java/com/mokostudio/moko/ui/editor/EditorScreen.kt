@@ -2,6 +2,11 @@
 
 package com.mokostudio.moko.ui.editor
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxScope
@@ -47,6 +52,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -63,6 +69,16 @@ fun EditorScreen(
     viewModel: EditorViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val writePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.saveImage()
+        } else {
+            viewModel.onSavePermissionDenied()
+        }
+    }
 
     LaunchedEffect(imageUri) {
         viewModel.loadImage(imageUri)
@@ -72,6 +88,16 @@ fun EditorScreen(
         uiState = uiState,
         onBackClick = onBackClick,
         onFilterSelected = viewModel::selectFilter,
+        onSaveClick = {
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+                context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                    PackageManager.PERMISSION_GRANTED
+            ) {
+                writePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            } else {
+                viewModel.saveImage()
+            }
+        },
         modifier = modifier
     )
 }
@@ -81,6 +107,7 @@ private fun EditorScreenContent(
     uiState: EditorUiState,
     onBackClick: () -> Unit,
     onFilterSelected: (FilterDefinition) -> Unit,
+    onSaveClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -215,23 +242,47 @@ private fun EditorScreenContent(
                 }
             }
 
-            Button(
-                onClick = {},
-                enabled = false,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(19.dp),
-                colors = ButtonDefaults.buttonColors(
-                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                    disabledContentColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f)
-                )
-            ) {
-                Text(
-                    text = "Save to gallery",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val saveFeedback = uiState.saveError ?: uiState.saveMessage
+                if (saveFeedback != null) {
+                    Text(
+                        text = saveFeedback,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (uiState.saveError != null) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
+                Button(
+                    onClick = onSaveClick,
+                    enabled = uiState.previewImage != null && !uiState.isLoading && !uiState.isSaving,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(19.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                        disabledContentColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f)
+                    )
+                ) {
+                    if (uiState.isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.size(10.dp))
+                    }
+                    Text(
+                        text = if (uiState.isSaving) "Saving" else "Save to gallery",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -466,7 +517,8 @@ private fun EditorScreenPreview() {
         EditorScreenContent(
             uiState = EditorUiState(),
             onBackClick = {},
-            onFilterSelected = {}
+            onFilterSelected = {},
+            onSaveClick = {}
         )
     }
 }

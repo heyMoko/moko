@@ -13,5 +13,8 @@ data class EditorUiState(
     val isLoading: Boolean = false,
     val isThumbnailLoading: Boolean = false,
     val loadingMessage: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val isSaving: Boolean = false,
+    val saveMessage: String? = null,
+    val saveError: String? = null
 )
