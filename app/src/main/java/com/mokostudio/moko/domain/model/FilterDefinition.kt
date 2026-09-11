@@ -22,14 +22,14 @@ data class FilterDefinition(
             id = "iphone_6",
             displayName = "iPhone 6",
             parameters = FilterParameters(
-                exposure = 0.025f,
-                contrast = 1.07f,
-                saturation = 1.06f,
-                temperature = 0.025f,
-                highlights = -0.04f,
-                shadows = 0.04f,
-                grain = 0.002f,
-                vignette = 0.02f
+                // Airy everyday color, open shadows and clean whites.
+                exposure = 0.055f,
+                contrast = 0.98f,
+                saturation = 0.94f,
+                temperature = 0.008f,
+                tint = 0.006f,
+                highlights = -0.055f,
+                shadows = 0.045f
             )
         )
 
@@ -37,16 +37,17 @@ data class FilterDefinition(
             id = "film",
             displayName = "Film",
             parameters = FilterParameters(
-                exposure = 0.015f,
-                contrast = 0.90f,
-                saturation = 0.82f,
-                temperature = 0.05f,
-                tint = 0.012f,
-                highlights = -0.03f,
-                shadows = 0.09f,
-                fade = 0.12f,
-                grain = 0.015f,
-                vignette = 0.09f
+                // Soft matte print: muted color, warm paper and gentle blacks.
+                exposure = 0.035f,
+                contrast = 0.86f,
+                saturation = 0.76f,
+                temperature = 0.026f,
+                tint = 0.008f,
+                highlights = -0.015f,
+                shadows = 0.025f,
+                fade = 0.10f,
+                grain = 0.018f,
+                vignette = 0.035f
             )
         )
 
@@ -54,15 +55,17 @@ data class FilterDefinition(
             id = "disposable",
             displayName = "Disposable",
             parameters = FilterParameters(
-                exposure = 0.035f,
-                contrast = 1.18f,
-                saturation = 1.18f,
-                temperature = 0.035f,
-                highlights = -0.06f,
-                shadows = -0.02f,
-                fade = 0.03f,
-                grain = 0.025f,
-                vignette = 0.16f
+                // Sun-warmed snapshot: amber color, punch and visible texture.
+                exposure = 0.06f,
+                contrast = 1.12f,
+                saturation = 1.10f,
+                temperature = 0.045f,
+                tint = -0.008f,
+                highlights = -0.075f,
+                shadows = 0.04f,
+                fade = 0.045f,
+                grain = 0.035f,
+                vignette = 0.10f
             )
         )
 
@@ -70,16 +73,15 @@ data class FilterDefinition(
             id = "digital",
             displayName = "Digital",
             parameters = FilterParameters(
-                exposure = -0.01f,
-                contrast = 1.23f,
-                saturation = 1.13f,
-                temperature = -0.035f,
-                tint = -0.01f,
-                highlights = -0.08f,
-                shadows = -0.02f,
-                fade = 0.01f,
-                grain = 0.012f,
-                vignette = 0.06f
+                // Crisp cool color and deeper blacks, without a film-grain overlay.
+                exposure = 0.025f,
+                contrast = 1.16f,
+                saturation = 1.16f,
+                temperature = -0.022f,
+                tint = -0.006f,
+                highlights = -0.065f,
+                shadows = 0.035f,
+                vignette = 0.025f
             )
         )
 
