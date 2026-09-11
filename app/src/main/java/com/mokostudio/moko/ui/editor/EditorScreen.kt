@@ -5,6 +5,21 @@ package com.mokostudio.moko.ui.editor
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.selected
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -70,6 +85,18 @@ fun EditorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var showSavingNotice by remember { mutableStateOf(false) }
+    val navigateBack = {
+        if (uiState.isSaving) showSavingNotice = true else onBackClick()
+    }
+    BackHandler(enabled = uiState.isSaving) { showSavingNotice = true }
+    if (showSavingNotice && uiState.isSaving) {
+        AlertDialog(onDismissRequest = { showSavingNotice = false },
+            title = { Text("Saving your photo") },
+            text = { Text("Keep this editor open for a moment. Your photo is being saved to the gallery.") },
+            confirmButton = { TextButton(onClick = { showSavingNotice = false }) { Text("Got it") } })
+    }
+    LaunchedEffect(uiState.isSaving) { if (!uiState.isSaving) showSavingNotice = false }
     val writePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -86,7 +113,8 @@ fun EditorScreen(
 
     EditorScreenContent(
         uiState = uiState,
-        onBackClick = onBackClick,
+        onBackClick = navigateBack,
+        onRetryClick = viewModel::retryImage,
         onFilterSelected = viewModel::selectFilter,
         onSaveClick = {
             if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
@@ -108,26 +136,23 @@ private fun EditorScreenContent(
     onBackClick: () -> Unit,
     onFilterSelected: (FilterDefinition) -> Unit,
     onSaveClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRetryClick: () -> Unit = {}
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            )
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.TopCenter
     ) {
+        val photoHeight = (maxHeight - 330.dp).coerceIn(180.dp, 720.dp)
         Column(
             modifier = Modifier
+                .widthIn(max = 720.dp)
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -137,6 +162,7 @@ private fun EditorScreenContent(
                 Box(
                     modifier = Modifier
                         .size(44.dp)
+                        .semantics { contentDescription = "Back to home" }
                         .clip(RoundedCornerShape(15.dp))
                         .background(MaterialTheme.colorScheme.surface)
                         .border(
@@ -156,7 +182,7 @@ private fun EditorScreenContent(
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "moko edit",
+                        text = "moko studio",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground
@@ -169,36 +195,24 @@ private fun EditorScreenContent(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(15.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "⇩",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Spacer(Modifier.size(44.dp))
             }
 
             Column {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(0.79f)
-                        .clip(RoundedCornerShape(30.dp))
-                        .background(MaterialTheme.colorScheme.surface)
+                        .height(photoHeight)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF252323))
                         .border(
                             1.dp,
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                            RoundedCornerShape(30.dp)
+                            RoundedCornerShape(8.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    PhotoPreview(uiState = uiState)
+                    PhotoPreview(uiState = uiState, onRetryClick = onRetryClick)
                 }
 
                 Spacer(modifier = Modifier.height(22.dp))
@@ -209,7 +223,7 @@ private fun EditorScreenContent(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Text(
-                        text = "Choose your mood",
+                        text = "Camera looks",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground
@@ -233,7 +247,7 @@ private fun EditorScreenContent(
                             filter = filter,
                             thumbnail = uiState.filterThumbnails[filter],
                             selected = uiState.selectedFilter == filter,
-                            enabled = uiState.previewImage != null && !uiState.isLoading,
+                            enabled = uiState.previewImage != null && !uiState.isLoading && !uiState.isSaving,
                             isLoading = uiState.isThumbnailLoading &&
                                 uiState.filterThumbnails[filter] == null,
                             onClick = { onFilterSelected(filter) },
@@ -263,9 +277,9 @@ private fun EditorScreenContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    shape = RoundedCornerShape(19.dp),
+                    shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(
-                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                        disabledContainerColor = if (uiState.isSaving) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
                         disabledContentColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f)
                     )
                 ) {
@@ -278,7 +292,7 @@ private fun EditorScreenContent(
                         Spacer(modifier = Modifier.size(10.dp))
                     }
                     Text(
-                        text = if (uiState.isSaving) "Saving" else "Save to gallery",
+                        text = if (uiState.isSaving) "Saving your photo…" else if (uiState.saveError != null) "Try saving again" else "Save to gallery",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -289,9 +303,13 @@ private fun EditorScreenContent(
 }
 
 @Composable
-private fun BoxScope.PhotoPreview(uiState: EditorUiState) {
+private fun BoxScope.PhotoPreview(uiState: EditorUiState, onRetryClick: () -> Unit) {
     when {
         uiState.isLoading -> {
+            uiState.previewImage?.let { preview ->
+                Image(preview.asImageBitmap(), null, Modifier.matchParentSize(), contentScale = ContentScale.Fit)
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.38f)))
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -301,19 +319,22 @@ private fun BoxScope.PhotoPreview(uiState: EditorUiState) {
                     Text(
                         text = message,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color.White
                     )
                 }
             }
         }
 
         uiState.error != null -> {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = uiState.error,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color.White,
                 modifier = Modifier.padding(24.dp)
             )
+            TextButton(onClick = onRetryClick) { Text("Reload photo", color = Color.White) }
+            }
         }
 
         uiState.previewImage != null && uiState.originalPreviewImage != null &&
@@ -360,13 +381,18 @@ private fun BoxScope.BeforeAfterPreview(
     original: android.graphics.Bitmap,
     processed: android.graphics.Bitmap
 ) {
-    var position by remember(original) { mutableFloatStateOf(DEFAULT_COMPARISON_POSITION) }
+    var position by rememberSaveable { mutableFloatStateOf(DEFAULT_COMPARISON_POSITION) }
     val dividerStroke = with(LocalDensity.current) { 2.dp.toPx() }
     val handleRadius = with(LocalDensity.current) { 18.dp.toPx() }
 
     Box(
         modifier = Modifier
             .matchParentSize()
+            .semantics {
+                contentDescription = "Before and after comparison"
+                progressBarRangeInfo = ProgressBarRangeInfo(position, 0f..1f)
+                setProgress { value -> position = value.coerceIn(0f, 1f); true }
+            }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
@@ -427,6 +453,8 @@ private fun BoxScope.BeforeAfterPreview(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(12.dp)
+                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
         )
         Text(
             text = "After",
@@ -435,6 +463,8 @@ private fun BoxScope.BeforeAfterPreview(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(12.dp)
+                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
         )
         Text(
             text = "Drag to compare",
@@ -443,6 +473,8 @@ private fun BoxScope.BeforeAfterPreview(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(12.dp)
+                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
         )
     }
 }
@@ -459,22 +491,23 @@ private fun FilterThumbnail(
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
+            .semantics { this.selected = selected }
             .clickable(enabled = enabled, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Box(
             modifier = Modifier
-                .height(102.dp)
+                .height(78.dp)
                 .aspectRatio(0.82f)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .then(
                     if (selected) {
                         Modifier.border(
                             width = 3.dp,
                             color = MaterialTheme.colorScheme.primary,
-                            shape = RoundedCornerShape(18.dp)
+                            shape = RoundedCornerShape(8.dp)
                         )
                     } else {
                         Modifier
@@ -491,7 +524,7 @@ private fun FilterThumbnail(
                 )
 
                 isLoading -> CircularProgressIndicator(
-                    modifier = Modifier.height(20.dp),
+                    modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.primary
                 )

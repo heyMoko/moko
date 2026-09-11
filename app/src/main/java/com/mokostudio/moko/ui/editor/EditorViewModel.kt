@@ -7,6 +7,7 @@ import com.mokostudio.moko.data.repository.EditorImageRepository
 import com.mokostudio.moko.domain.model.FilterDefinition
 import com.mokostudio.moko.domain.model.PersonMask
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -22,7 +23,8 @@ import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class EditorViewModel @Inject constructor(
-    private val imageRepository: EditorImageRepository
+    private val imageRepository: EditorImageRepository,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -36,13 +38,17 @@ class EditorViewModel @Inject constructor(
     private var imageRequestToken = 0
     private var filterRequestToken = 0
 
-    fun loadImage(uriString: String?) {
+    fun loadImage(uriString: String?, force: Boolean = false) {
         val uri = uriString?.let(Uri::parse)
-        if (uri == null || uri == _uiState.value.originalImageUri) {
+        if (uri == null || (!force && uri == _uiState.value.originalImageUri)) {
             return
         }
 
         imageRequestToken++
+        filterRequestToken++
+        val restoredFilter = FilterDefinition.EditorFilters.firstOrNull {
+            it.id == savedStateHandle.get<String>("selected_filter")
+        } ?: FilterDefinition.Original
         val token = imageRequestToken
         loadJob?.cancel()
         filterJob?.cancel()
@@ -91,8 +97,10 @@ class EditorViewModel @Inject constructor(
                         )
                     }
                     createFilterThumbnails(uri, processedImage.bitmap, token)
+                    if (restoredFilter != FilterDefinition.Original) selectFilter(restoredFilter)
                 },
                 onFailure = {
+                    if (it is CancellationException) return@fold
                     Log.e(TAG, "Could not load photo: $uri", it)
                     _uiState.update { state ->
                         state.copy(
@@ -218,6 +226,7 @@ class EditorViewModel @Inject constructor(
             _uiState.update { state ->
                 result.fold(
                     onSuccess = { processedImage ->
+                        savedStateHandle["selected_filter"] = processedImage.filter.id
                         state.copy(
                             previewImage = processedImage.bitmap,
                             selectedFilter = processedImage.filter,
@@ -310,6 +319,10 @@ class EditorViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun retryImage() {
+        loadImage(_uiState.value.originalImageUri?.toString(), force = true)
     }
 
     fun onSavePermissionDenied() {
